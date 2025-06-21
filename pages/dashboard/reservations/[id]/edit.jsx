@@ -27,31 +27,9 @@ function EditReservation({ initialReservation }) {
         name: initialReservation.name || '',
         email: initialReservation.email || '',
       });
+      setPayments(initialReservation.payments || []);
     }
   }, [initialReservation]);
-
-  useEffect(() => {
-    const fetchPayments = async () => {
-      try {
-        const res = await fetch(
-          `/api/backend/reservations/${router.query.id}/payments`,
-          {
-            headers: {
-              Authorization: `Bearer ${document.cookie.split('token=')[1]}`,
-            },
-          }
-        );
-        if (!res.ok) throw new Error('Error al obtener pagos');
-
-        const data = await res.json();
-        setPayments(data);
-      } catch (err) {
-        console.error(err.message);
-      }
-    };
-
-    if (router.query.id) fetchPayments();
-  }, [router.query.id]);
 
   const handleChange = async (e) => {
     const { name, value } = e.target;
@@ -217,6 +195,21 @@ function EditReservation({ initialReservation }) {
           <ul>
             {payments.map((p, i) => (
               <li key={i}>${p.amount}</li>
+            ))}
+          </ul>
+        </>
+      )}
+
+      {initialReservation.channelReservationSyncs?.length > 0 && (
+        <>
+          <h3>Logs de sincronización</h3>
+          <ul>
+            {initialReservation.channelReservationSyncs.map((log) => (
+              <li key={log.id}>
+                [{new Date(log.createdAt).toLocaleString()}] {log.status} - Canal:{' '}
+                {log.connection?.channel?.name || 'Desconocido'} - ID externo:{' '}
+                {log.externalResId}
+              </li>
             ))}
           </ul>
         </>
