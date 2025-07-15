@@ -1,6 +1,21 @@
 import Layout from '@/components/Layout';
-import { useState } from 'react';
-import styled from 'styled-components';
+import { useState, useEffect } from 'react';
+import styled, { createGlobalStyle } from 'styled-components';
+import { useTranslation } from 'next-i18next';
+import { serverSideTranslations } from 'next-i18next/serverSideTranslations';
+import { i18n } from 'next-i18next';
+import DatePicker, { registerLocale } from 'react-datepicker';
+import es from 'date-fns/locale/es';
+import en from 'date-fns/locale/en-US';
+import { useRouter } from 'next/router';
+import { format, isBefore } from 'date-fns';
+import 'react-datepicker/dist/react-datepicker.css';
+
+const GlobalStyle = createGlobalStyle`
+  .react-datepicker-popper {
+    z-index: 9999 !important;
+  }
+`;
 
 const Wrapper = styled.main`
   max-width: 800px;
@@ -60,47 +75,139 @@ const Button = styled.button`
   }
 `;
 
+const StyledDatePicker = styled(DatePicker)`
+  padding: 6px;
+  font-size: 1rem;
+  margin-top: 4px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+`;
+
+const DateFieldWrapper = styled.div`
+  position: relative;
+`;
+
 export default function HostelPage({ hostel, rooms }) {
-  const [from, setFrom] = useState('');
-  const [to, setTo] = useState('');
+  const [from, setFrom] = useState(null);
+  const [to, setTo] = useState(null);
   const [guests, setGuests] = useState(1);
+  const { t } = useTranslation('common');
+  const router = useRouter();
+
+  useEffect(() => {
+    if (i18n?.language === 'es') {
+      registerLocale('es', es);
+    } else {
+      registerLocale('en', en);
+    }
+  }, [i18n?.language]);
+
+  useEffect(() => {
+    if (from && (!to || to <= from)) {
+      const nextDay = new Date(from);
+      nextDay.setDate(from.getDate() + 1);
+      setTo(nextDay);
+    }
+  }, [from]);
+
+  useEffect(() => {
+    if (to && !from) {
+      const prevDay = new Date(to);
+      prevDay.setDate(to.getDate() - 1);
+      setFrom(prevDay);
+    }
+  }, [to]);
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0); // asegurar comparación sin hora
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (!from || !to) return;
+
+    const formattedFrom = format(from, 'yyyy-MM-dd');
+    const formattedTo = format(to, 'yyyy-MM-dd');
+
+    const params = new URLSearchParams({
+      from: formattedFrom,
+      to: formattedTo,
+      guests: guests.toString(),
+    });
+
+    router.push(`/hostels/${hostel.slug}/availability?${params.toString()}`);
+  };
 
   return (
     <Layout>
-      <Title>{hostel.name}</Title>
+      <GlobalStyle />
+      <Wrapper>
+        <Title>{hostel.name}</Title>
 
-      <SectionTitle>Habitaciones</SectionTitle>
-      <RoomList>
-        {rooms.map((room) => (
-          <RoomItem key={room.id}>
-            <strong>{room.name}</strong> – {room.capacity} personas
-          </RoomItem>
-        ))}
-      </RoomList>
+        <SectionTitle>{t('rooms_title')}</SectionTitle>
+        <RoomList>
+          {rooms.map((room) => (
+            <RoomItem key={room.id}>
+              <strong>{t(`roomType.${room.slug}`)}</strong> – {room.capacity} {t('guests')}
+            </RoomItem>
+          ))}
+        </RoomList>
 
-      <SectionTitle>Buscar disponibilidad</SectionTitle>
-      <Form method="GET" action={`/public/hostels/${hostel.slug}/availability`}>
-        <Field>
-          Desde:
-          <Input type="date" name="from" value={from} onChange={(e) => setFrom(e.target.value)} required />
-        </Field>
-        <Field>
-          Hasta:
-          <Input type="date" name="to" value={to} onChange={(e) => setTo(e.target.value)} required />
-        </Field>
-        <Field>
-          Huéspedes:
-          <Input type="number" name="guests" value={guests} min={1} onChange={(e) => setGuests(e.target.value)} />
-        </Field>
-        <Button type="submit">Buscar</Button>
-      </Form>
+        <SectionTitle>{t('availability_title')}</SectionTitle>
+        <Form onSubmit={handleSubmit}>
+          <Field>
+            {t('from')}:
+            <DateFieldWrapper>
+              <StyledDatePicker
+                selected={from}
+                onChange={(date) => setFrom(date)}
+                name="from"
+                locale={i18n?.language}
+                dateFormat="P"
+                popperPlacement="bottom-start"
+                required
+                autoComplete="off"
+                minDate={today}
+              />
+            </DateFieldWrapper>
+          </Field>
+
+          <Field>
+            {t('to')}:
+            <DateFieldWrapper>
+              <StyledDatePicker
+                selected={to}
+                onChange={(date) => setTo(date)}
+                name="to"
+                locale={i18n?.language}
+                dateFormat="P"
+                popperPlacement="bottom-start"
+                required
+                autoComplete="off"
+                minDate={from ? new Date(from.getTime() + 86400000) : new Date(today.getTime() + 86400000)}
+              />
+            </DateFieldWrapper>
+          </Field>
+
+          <Field>
+            {t('guests')}:
+            <Input
+              type="number"
+              name="guests"
+              value={guests}
+              min={1}
+              onChange={(e) => setGuests(e.target.value)}
+            />
+          </Field>
+
+          <Button type="submit">{t('search')}</Button>
+        </Form>
+      </Wrapper>
     </Layout>
   );
 }
 
-export async function getServerSideProps(context) {
-  const { slug } = context.params;
-  console.log("pepe")
+export async function getServerSideProps({ params, locale }) {
+  const { slug } = params;
 
   const res = await fetch(`http://localhost:3001/public/hostels/${slug}/rooms`);
   if (!res.ok) {
@@ -111,6 +218,7 @@ export async function getServerSideProps(context) {
 
   return {
     props: {
+      ...(await serverSideTranslations(locale, ['common'])),
       hostel: data.hostel,
       rooms: data.rooms,
     },

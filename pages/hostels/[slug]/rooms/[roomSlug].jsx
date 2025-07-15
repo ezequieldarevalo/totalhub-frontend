@@ -1,6 +1,7 @@
 // pages/hostels/[slug]/rooms/[roomSlug].js
 import styled from 'styled-components';
 import { useRouter } from 'next/router';
+import Image from 'next/image';
 
 const Container = styled.div`
   max-width: 800px;
@@ -18,6 +19,11 @@ const Info = styled.p`
   margin: 0.5rem 0;
 `;
 
+const Description = styled.p`
+  margin-top: 1rem;
+  font-size: 1.1rem;
+`;
+
 const Button = styled.button`
   margin-top: 2rem;
   padding: 0.75rem 1.5rem;
@@ -31,6 +37,13 @@ const Button = styled.button`
   &:hover {
     background-color: #005bb5;
   }
+`;
+
+const Gallery = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-top: 1rem;
 `;
 
 export default function RoomDetails({ room, from, to, guests }) {
@@ -62,43 +75,27 @@ export default function RoomDetails({ room, from, to, guests }) {
   return (
     <Container>
       <Title>{room.name}</Title>
+      {room.description && <Description>{room.description}</Description>}
       <Info><strong>Capacidad:</strong> {room.capacity} personas</Info>
       <Info><strong>Fechas seleccionadas:</strong> {from} a {to}</Info>
       <Info><strong>Huéspedes:</strong> {guests}</Info>
 
+      {room.photos?.length > 0 && (
+        <Gallery>
+          {room.photos.map((url, idx) => (
+            <Image
+              key={idx}
+              src={url}
+              alt={`Foto ${idx + 1}`}
+              width={300}
+              height={200}
+              style={{ objectFit: 'cover', borderRadius: '8px' }}
+            />
+          ))}
+        </Gallery>
+      )}
+
       <Button onClick={handleClick}>Confirmar reserva</Button>
     </Container>
   );
-}
-
-export async function getServerSideProps(context) {
-  const { slug, roomSlug } = context.params;
-  const { from = '', to = '', guests = '' } = context.query;
-
-  try {
-    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/public/hostels/${slug}/rooms/${roomSlug}`);
-    const room = await res.json();
-
-    if (!res.ok) {
-      return { notFound: true };
-    }
-
-    return {
-      props: {
-        room,
-        from,
-        to,
-        guests,
-      },
-    };
-  } catch (err) {
-    return {
-      props: {
-        room: null,
-        from,
-        to,
-        guests,
-      },
-    };
-  }
 }

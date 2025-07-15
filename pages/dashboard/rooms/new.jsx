@@ -1,20 +1,13 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { withAuth } from '@/lib/withAuth';
 import DashboardLayout from '../layout';
 
-export default function NewRoom({ token }) {
+export default function NewRoom({ token, roomTypes, features }) {
   const router = useRouter();
-  const [form, setForm] = useState({
-    name: '',
-    slug: '',
-    capacity: 1,
-  });
+  const [selectedRoomType, setSelectedRoomType] = useState(roomTypes?.[0]?.id || '');
+  const [selectedFeatures, setSelectedFeatures] = useState([]);
   const [message, setMessage] = useState(null);
-
-  const handleChange = (e) => {
-    setForm({ ...form, [e.target.name]: e.target.value });
-  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -28,9 +21,8 @@ export default function NewRoom({ token }) {
           Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
-          name: form.name,
-          slug: form.slug,
-          capacity: parseInt(form.capacity, 10),
+          roomTypeId: selectedRoomType,
+          featureIds: selectedFeatures, // Nuevo campo
         }),
       });
 
@@ -43,44 +35,51 @@ export default function NewRoom({ token }) {
     }
   };
 
+  const handleFeatureChange = (e) => {
+    const { value, checked } = e.target;
+    setSelectedFeatures((prev) =>
+      checked ? [...prev, value] : prev.filter((f) => f !== value)
+    );
+  };
+
   return (
-    <DashboardLayout pageTitle='Creación de habitacion'>
-      <h1>Nueva habitación</h1>
+    <DashboardLayout pageTitle="Creación de habitación">
+      <h1>Crear nueva habitación</h1>
 
       <form onSubmit={handleSubmit}>
         <label>
-          Nombre:
-          <input
-            type="text"
-            name="name"
-            value={form.name}
-            onChange={handleChange}
+          Tipo de habitación:
+          <select
+            name="roomTypeId"
+            value={selectedRoomType}
+            onChange={(e) => setSelectedRoomType(e.target.value)}
             required
-          />
+          >
+            {roomTypes.map((rt) => (
+              <option key={rt.id} value={rt.id}>
+                {rt.name} — {rt.capacity} personas
+              </option>
+            ))}
+          </select>
         </label>
-        <br />
-        <label>
-          Slug:
-          <input
-            type="text"
-            name="slug"
-            value={form.slug}
-            onChange={handleChange}
-            required
-          />
-        </label>
-        <br />
-        <label>
-          Capacidad:
-          <input
-            type="number"
-            name="capacity"
-            value={form.capacity}
-            onChange={handleChange}
-            min="1"
-            required
-          />
-        </label>
+
+        <br /><br />
+
+        <fieldset>
+          <legend>Comodidades:</legend>
+          {features.map((feature) => (
+            <label key={feature.id} style={{ display: 'block' }}>
+              <input
+                type="checkbox"
+                value={feature.id}
+                checked={selectedFeatures.includes(feature.id)}
+                onChange={handleFeatureChange}
+              />
+              {feature.name}
+            </label>
+          ))}
+        </fieldset>
+
         <br />
         <button type="submit">Crear habitación</button>
       </form>
@@ -93,9 +92,35 @@ export default function NewRoom({ token }) {
 export const getServerSideProps = withAuth(async (ctx) => {
   const token = ctx.req.cookies.token || '';
 
-  return {
-    props: {
-      token,
-    },
-  };
+  try {
+    const [roomTypesRes, featuresRes] = await Promise.all([
+      fetch(`${process.env.NEXT_PUBLIC_API_URL}/room-types`, {
+        headers: { Authorization: `Bearer ${token}` },
+      }),
+      fetch(`${process.env.NEXT_PUBLIC_API_URL}/features`, {
+        headers: { Authorization: `Bearer ${token}` },
+      }),
+    ]);
+
+    const [roomTypesData, featuresData] = await Promise.all([
+      roomTypesRes.json(),
+      featuresRes.json(),
+    ]);
+
+    return {
+      props: {
+        token,
+        roomTypes: roomTypesRes.ok && Array.isArray(roomTypesData) ? roomTypesData : [],
+        features: featuresRes.ok && Array.isArray(featuresData) ? featuresData : [],
+      },
+    };
+  } catch (err) {
+    return {
+      props: {
+        token,
+        roomTypes: [],
+        features: [],
+      },
+    };
+  }
 });

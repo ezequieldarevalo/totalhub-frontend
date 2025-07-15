@@ -1,8 +1,12 @@
+import { appWithTranslation } from 'next-i18next';
 import { ThemeProvider } from 'styled-components';
 import { GlobalStyle } from '../styles/globalStyles';
 import { theme } from '../styles/theme';
+import 'slick-carousel/slick/slick.css';
+import 'slick-carousel/slick/slick-theme.css';
 
-export default function App({ Component, pageProps }) {
+
+function App({ Component, pageProps }) {
   return (
     <ThemeProvider theme={theme}>
       <GlobalStyle />
@@ -10,3 +14,5 @@ export default function App({ Component, pageProps }) {
     </ThemeProvider>
   );
 }
+
+export default appWithTranslation(App);

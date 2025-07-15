@@ -1,20 +1,21 @@
-// pages/dashboard/rooms/[id]/edit.jsx
 import { useState } from 'react';
 import { useRouter } from 'next/router';
 import { withAuth } from '@/lib/withAuth';
 import DashboardLayout from '../../layout';
 
-export default function EditRoom({ room, token }) {
+export default function EditRoom({ room, token, features }) {
   const router = useRouter();
-  const [form, setForm] = useState({
-    name: room.name,
-    slug: room.slug,
-    capacity: room.capacity,
-  });
+
+  const [selectedFeatures, setSelectedFeatures] = useState(
+    room.features?.map((f) => f.id) || []
+  );
   const [message, setMessage] = useState(null);
 
-  const handleChange = (e) => {
-    setForm({ ...form, [e.target.name]: e.target.value });
+  const handleFeatureChange = (e) => {
+    const { value, checked } = e.target;
+    setSelectedFeatures((prev) =>
+      checked ? [...prev, value] : prev.filter((id) => id !== value)
+    );
   };
 
   const handleSubmit = async (e) => {
@@ -29,9 +30,7 @@ export default function EditRoom({ room, token }) {
           Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
-          name: form.name,
-          slug: form.slug,
-          capacity: parseInt(form.capacity, 10),
+          featureIds: selectedFeatures,
         }),
       });
 
@@ -45,43 +44,31 @@ export default function EditRoom({ room, token }) {
   };
 
   return (
-    <DashboardLayout pageTitle='Edición de habitación'>
+    <DashboardLayout pageTitle="Edición de habitación">
       <h1>Editar habitación</h1>
 
+      <p>
+        <strong>Nombre:</strong> {room.roomType.name}
+        <br />
+        <strong>Capacidad:</strong> {room.roomType.capacity}
+      </p>
+
       <form onSubmit={handleSubmit}>
-        <label>
-          Nombre:
-          <input
-            type="text"
-            name="name"
-            value={form.name}
-            onChange={handleChange}
-            required
-          />
-        </label>
-        <br />
-        <label>
-          Slug:
-          <input
-            type="text"
-            name="slug"
-            value={form.slug}
-            onChange={handleChange}
-            required
-          />
-        </label>
-        <br />
-        <label>
-          Capacidad:
-          <input
-            type="number"
-            name="capacity"
-            value={form.capacity}
-            onChange={handleChange}
-            min="1"
-            required
-          />
-        </label>
+        <fieldset>
+          <legend>Comodidades:</legend>
+          {features.map((feature) => (
+            <label key={feature.id} style={{ display: 'block' }}>
+              <input
+                type="checkbox"
+                value={feature.id}
+                checked={selectedFeatures.includes(feature.id)}
+                onChange={handleFeatureChange}
+              />
+              {feature.slug}
+            </label>
+          ))}
+        </fieldset>
+
         <br />
         <button type="submit">Guardar cambios</button>
       </form>
@@ -91,25 +78,31 @@ export default function EditRoom({ room, token }) {
   );
 }
 
-export const getServerSideProps = withAuth(async (ctx, user) => {
+export const getServerSideProps = withAuth(async (ctx) => {
   const { id } = ctx.params;
   const token = ctx.req.cookies.token || '';
 
   try {
-    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/rooms`, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    });
+    const [roomRes, featuresRes] = await Promise.all([
+      fetch(`${process.env.NEXT_PUBLIC_API_URL}/rooms/${id}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      }),
+      fetch(`${process.env.NEXT_PUBLIC_API_URL}/room-features`, {
+        headers: { Authorization: `Bearer ${token}` },
+      }),
+    ]);
 
-    const rooms = await res.json();
-    const room = rooms.find((r) => r.id === id);
+    const [room, features] = await Promise.all([
+      roomRes.json(),
+      featuresRes.json(),
+    ]);
 
-    if (!room) return { notFound: true };
+    if (!roomRes.ok || !room) return { notFound: true };
 
     return {
       props: {
         room,
+        features,
         token,
       },
     };

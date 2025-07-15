@@ -1,255 +1,169 @@
-import { useState, useEffect } from 'react';
-import { withAuth } from '@/lib/withAuth'
+import { useEffect, useState, useMemo } from 'react';
+import { withAuth } from '@/lib/withAuth';
 import DashboardLayout from '../layout';
+import { debounce } from '@/lib/utils/debounce';
 
-export default function DayPricesPage({ rooms }) {
-  const [form, setForm] = useState({
-    roomId: '',
-    date: '',
-    price: '',
-  });
-  const [message, setMessage] = useState(null);
-  const [prices, setPrices] = useState([]);
+export default function DayPricesIndex({ rooms }) {
+  const today = new Date();
+  const oneWeekLater = new Date();
+  oneWeekLater.setDate(today.getDate() + 7);
+
+  const formatDate = (date) => date.toISOString().split('T')[0];
+
+  const [from, setFrom] = useState(formatDate(today));
+  const [to, setTo] = useState(formatDate(oneWeekLater));
+  
+  const [data, setData] = useState([]); // [{ roomId, date, price, availableCapacity, id }]
   const [loading, setLoading] = useState(false);
-  const [editing, setEditing] = useState(null);
-  const [editPrice, setEditPrice] = useState('');
+  const [massPrice, setMassPrice] = useState('');
+  const [massCapacity, setMassCapacity] = useState('');
 
-  const handleChange = (e) => {
-    setForm({ ...form, [e.target.name]: e.target.value });
-  };
-
-  const fetchPrices = async () => {
-    if (!form.roomId) return;
+  const fetchData = async () => {
+    if (!from || !to) return;
     setLoading(true);
 
-    try {
-      const res = await fetch(
-        `/api/backend/day-prices?roomId=${form.roomId}&from=2025-01-01&to=2025-12-31`,
-        {
-          headers: {
-            Authorization: `Bearer ${document.cookie.split('token=')[1]}`,
-          },
-        }
+    const res = await fetch(`/api/backend/day-prices/range?from=${from}&to=${to}`, {
+      headers: {
+        Authorization: `Bearer ${document.cookie.split('token=')[1]}`,
+      },
+    });
+
+    const result = await res.json();
+
+    if (res.ok) {
+      const normalized = result.flatMap((roomEntry) =>
+        roomEntry.prices.map((p) => ({
+          id: p.id,
+          roomId: roomEntry.room.id,
+          roomName: roomEntry.room.name,
+          roomCapacity: roomEntry.room.capacity,
+          date: p.date,
+          price: p.price,
+          availableCapacity: p.availableCapacity,
+        }))
       );
-      const data = await res.json();
-      console.log('>>> precios recibidos', data);
-      if (res.ok) {
-        setPrices(data);
-      } else {
-        setMessage(data.message || 'Error al cargar precios');
-        setPrices([]);
-      }
-    } catch {
-      setMessage('Error al obtener precios');
-    } finally {
-      setLoading(false);
+      setData(normalized);
+    } else {
+      alert(result.message || 'Error al cargar datos');
     }
+
+    setLoading(false);
   };
 
   useEffect(() => {
-    fetchPrices();
-  }, [form.roomId]);
+    fetchData();
+  }, [from, to]);
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setMessage(null);
-
+  const updateValue = async (id, field, value, oldValue) => {
     try {
-      const res = await fetch(`/api/backend/day-prices`, {
-        method: 'POST',
+      const res = await fetch(`/api/backend/day-prices/${id}`, {
+        method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${document.cookie.split('token=')[1]}`,
         },
-        body: JSON.stringify({
-          roomId: form.roomId,
-          date: form.date,
-          price: parseFloat(form.price),
-        }),
-      });
-
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.message || 'Error al cargar el precio');
-
-      setMessage('Precio cargado correctamente');
-      setForm({ ...form, date: '', price: '' });
-      fetchPrices();
-    } catch (err) {
-      setMessage(err.message);
-    }
-  };
-
-  const handleEditSubmit = async (id, date) => {
-    try {
-      const res = await fetch(`/api/backend/day-prices`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${document.cookie.split('token=')[1]}`,
-        },
-        body: JSON.stringify({
-          roomId: form.roomId,
-          date,
-          price: parseFloat(editPrice),
-        }),
+        body: JSON.stringify({ [field]: parseFloat(value) }),
       });
 
       if (!res.ok) {
-        const data = await res.json();
-        alert(data.message || 'Error al editar');
-      } else {
-        setEditing(null);
-        setEditPrice('');
-        fetchPrices();
+        throw new Error('Falló la actualización');
       }
-    } catch {
-      alert('Error al editar');
+    } catch (err) {
+      alert('Error al guardar, se restaurará el valor anterior');
+      setData((prev) =>
+        prev.map((entry) =>
+          entry.id === id ? { ...entry, [field]: oldValue } : entry
+        )
+      );
     }
   };
 
+  const debouncedUpdate = useMemo(() => debounce(updateValue, 500), []);
+
+  const handleChange = (id, field, value) => {
+    setData((prev) =>
+      prev.map((entry) =>
+        entry.id === id ? { ...entry, [field]: value } : entry
+      )
+    );
+    const oldEntry = data.find((entry) => entry.id === id);
+    const oldValue = oldEntry?.[field];
+    debouncedUpdate(id, field, value, oldValue);
+  };
+
+  const uniqueDates = [...new Set(data.map((d) => d.date).filter(Boolean))].sort();
+
   return (
-    <DashboardLayout pageTitle='Precios diarios'>
+    <DashboardLayout pageTitle="Precios por día">
+      <h1>Precios diarios por habitación</h1>
 
-      <h1>Precios diarios</h1>
-
-      <form onSubmit={handleSubmit}>
-        <label>
-          Habitación:
-          <select
-            name="roomId"
-            value={form.roomId}
-            onChange={handleChange}
-            required
-          >
-            <option value="">Seleccionar</option>
-            {rooms.map((room) => (
-              <option key={room.id} value={room.id}>
-                {room.name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <br />
-        <label>
-          Fecha:
-          <input
-            type="date"
-            name="date"
-            value={form.date}
-            onChange={handleChange}
-            required
-          />
-        </label>
-        <br />
-        <label>
-          Precio:
-          <input
-            type="number"
-            name="price"
-            value={form.price}
-            onChange={handleChange}
-            step="0.01"
-            required
-          />
-        </label>
-        <br />
-        <button type="submit">Cargar precio</button>
-      </form>
-
-      {message && <p style={{ marginTop: '1rem' }}>{message}</p>}
-
-      {form.roomId && (
-        <>
-          <h2 style={{ marginTop: '2rem' }}>Precios existentes</h2>
-          {loading ? (
-            <p>Cargando precios...</p>
-          ) : prices.length > 0 ? (
-            <table border="1" cellPadding="8" style={{ marginTop: '1rem' }}>
-              <thead>
-                <tr>
-                  <th>Fecha</th>
-                  <th>Precio</th>
-                  <th>Acciones</th>
-                </tr>
-              </thead>
-              <tbody>
-                {prices.map((p) => (
-                  <tr key={p.id}>
-                    <td>{p.date.split('T')[0]}</td>
-                    <td>
-                      {editing === p.id ? (
-                        <input
-                          type="number"
-                          value={editPrice}
-                          onChange={(e) => setEditPrice(e.target.value)}
-                          style={{ width: '80px' }}
-                        />
-                      ) : (
-                        `$${p.price}`
-                      )}
-                    </td>
-                    <td>
-                      {editing === p.id ? (
-                        <>
-                          <button onClick={() => handleEditSubmit(p.id, p.date)}>Guardar</button>
-                          <button onClick={() => setEditing(null)}>Cancelar</button>
-                        </>
-                      ) : (
-                        <>
-                          <button
-                            onClick={() => {
-                              setEditing(p.id);
-                              setEditPrice(p.price);
-                            }}
-                            style={{ marginRight: '0.5rem' }}
-                          >
-                            Editar
-                          </button>
-                          <button
-                            onClick={async () => {
-                              if (!confirm(`¿Eliminar precio del ${p.date.split('T')[0]}?`)) return;
-
-                              try {
-                                await fetch(`/api/backend/day-prices/${p.id}`, {
-                                  method: 'DELETE',
-                                  headers: {
-                                    Authorization: `Bearer ${document.cookie.split('token=')[1]}`,
-                                  },
-                                });
+      <div>
+        <label>Desde: </label>
+        <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
+        <label>Hasta: </label>
+        <input type="date" value={to} onChange={(e) => setTo(e.target.value)} />
+      </div>
 
 
-                                if (res.ok) {
-                                  fetchPrices();
-                                } else {
-                                  const data = await res.json();
-                                  alert(data.message || 'Error al eliminar');
-                                }
-                              } catch {
-                                alert('Error al eliminar');
-                              }
-                            }}
-                            style={{
-                              background: '#dc3545',
-                              color: 'white',
-                              border: 'none',
-                              padding: '0.3rem 0.6rem',
-                              borderRadius: '4px',
-                              cursor: 'pointer',
-                            }}
-                          >
-                            Eliminar
-                          </button>
-                        </>
-                      )}
-                    </td>
-                  </tr>
+      {loading ? (
+        <p>Cargando datos...</p>
+      ) : (
+        <div style={{ overflowX: 'auto', marginTop: '1rem' }}>
+          <table border="1" cellPadding="8">
+            <thead>
+              <tr>
+                <th>Habitación</th>
+                {uniqueDates.map((date) => (
+                  <th key={date}>{date?.split('T')[0]}</th>
                 ))}
-              </tbody>
-            </table>
-          ) : (
-            <p>No hay precios cargados para esta habitación.</p>
-          )}
-        </>
+              </tr>
+            </thead>
+            <tbody>
+              {rooms.map((room) => (
+                <tr key={room.id}>
+                  <td>{room.name}</td>
+                  {uniqueDates.map((date) => {
+                    const record = data.find((d) => d.roomId === room.id && d.date === date);
+                    console.log(record)
+                    if (!record || !record.id) {
+                      console.warn('⚠️ Record sin ID detectado', { room, date, record });
+                      return (
+                        <td key={date}>
+                          <span style={{ color: 'gray' }}>–</span>
+                        </td>
+                      );
+                    }
+
+                    return (
+                      <td key={date}>
+                        <div style={{ display: 'flex', flexDirection: 'column' }}>
+                          <input
+                            type="number"
+                            placeholder="Precio"
+                            value={record.price ?? ''}
+                            onChange={(e) =>
+                              handleChange(record.id, 'price', e.target.value)
+                            }
+                            style={{ width: '80px' }}
+                          />
+                          <input
+                            type="number"
+                            placeholder="Capacidad"
+                            value={record.availableCapacity ?? ''}
+                            onChange={(e) =>
+                              handleChange(record.id, 'availableCapacity', e.target.value)
+                            }
+                            style={{ width: '80px', marginTop: '4px' }}
+                          />
+                        </div>
+                      </td>
+                    );
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
     </DashboardLayout>
   );
@@ -257,16 +171,11 @@ export default function DayPricesPage({ rooms }) {
 
 export const getServerSideProps = withAuth(async (ctx, user) => {
   const token = ctx.req.cookies.token || '';
-
   try {
     const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/rooms`, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
+      headers: { Authorization: `Bearer ${token}` },
     });
-
     if (!res.ok) return { props: { rooms: [] } };
-
     const rooms = await res.json();
     return { props: { rooms } };
   } catch {

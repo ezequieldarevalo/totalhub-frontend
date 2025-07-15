@@ -1,216 +1,149 @@
-// pages/dashboard/day-prices/bulk.jsx
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { withAuth } from '@/lib/withAuth';
+import DashboardLayout from '../layout';
 
-export default function BulkDayPricesPage({ rooms }) {
-  const [form, setForm] = useState({
-    roomId: '',
-    from: '',
-    to: '',
-  });
+function DayPricesBulkPage() {
+  const [rooms, setRooms] = useState([]);
+  const [selectedRooms, setSelectedRooms] = useState([]);
+  const [from, setFrom] = useState('');
+  const [to, setTo] = useState('');
+  const [price, setPrice] = useState('');
+  const [capacity, setCapacity] = useState('');
   const [loading, setLoading] = useState(false);
-  const [days, setDays] = useState([]);
-  const [message, setMessage] = useState(null);
+  const [success, setSuccess] = useState(false);
+  const [error, setError] = useState('');
+  const [conflictModalOpen, setConflictModalOpen] = useState(false);
 
-  const handleChange = (e) =>
-    setForm({ ...form, [e.target.name]: e.target.value });
-
-  const fetchPrices = async () => {
-    setLoading(true);
-    setMessage(null);
-
-    try {
-      const res = await fetch(
-        `/api/backend/day-prices?roomId=${form.roomId}&from=${form.from}&to=${form.to}`,
-        {
-          headers: {
-            Authorization: `Bearer ${document.cookie.split('token=')[1]}`,
-          },
-        }
-      );
+  useEffect(() => {
+    const fetchRooms = async () => {
+      const res = await fetch('/api/backend/rooms', {
+        headers: {
+          Authorization: `Bearer ${document.cookie.split('token=')[1]}`,
+        },
+      });
       const data = await res.json();
+      setRooms(data);
+    };
+    fetchRooms();
+  }, []);
 
-      if (!res.ok) throw new Error(data.message || 'Error al cargar precios');
+  const handleSubmit = async () => {
+    setError('');
+    if (!from || !to || (!price && !capacity) || selectedRooms.length === 0) {
+      setError('Completá todos los campos necesarios');
+      return;
+    }
 
-      // Creamos una fila por cada día entre from y to
-      const fromDate = new Date(form.from);
-      const toDate = new Date(form.to);
-      const dates = [];
+    const res = await fetch('/api/backend/day-prices/check-conflicts', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${document.cookie.split('token=')[1]}`,
+      },
+      body: JSON.stringify({ roomIds: selectedRooms, from, to }),
+    });
 
-      for (
-        let d = new Date(fromDate);
-        d <= toDate;
-        d.setDate(d.getDate() + 1)
-      ) {
-        const dateStr = d.toISOString().split('T')[0];
-        const existing = data.find((p) => p.date.startsWith(dateStr));
-        dates.push({
-          date: dateStr,
-          price: existing?.price ?? '',
-        });
-      }
-
-      setDays(dates);
-    } catch (err) {
-      setMessage(err.message);
-      setDays([]);
-    } finally {
-      setLoading(false);
+    const result = await res.json();
+    if (res.ok && result?.hasConflicts) {
+      setConflictModalOpen(true);
+    } else {
+      await submitBulkUpdate(); // sin conflictos
     }
   };
 
-  const handlePriceChange = (index, value) => {
-    const updated = [...days];
-    updated[index].price = value;
-    setDays(updated);
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setMessage(null);
+  const submitBulkUpdate = async (overwrite = false) => {
+    setConflictModalOpen(false);
+    setError('');
+    setSuccess(false);
     setLoading(true);
 
-    try {
-      for (const day of days) {
-        await fetch(`/api/backend/day-prices`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${document.cookie.split('token=')[1]}`,
-          },
-          body: JSON.stringify({
-            roomId: form.roomId,
-            date: day.date,
-            price: parseFloat(day.price),
-          }),
-        });
-      }
+    const res = await fetch('/api/backend/day-prices/bulk', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${document.cookie.split('token=')[1]}`,
+      },
+      body: JSON.stringify({
+        roomIds: selectedRooms,
+        from,
+        to,
+        price: price ? parseFloat(price) : undefined,
+        availableCapacity: capacity ? parseFloat(capacity) : undefined,
+        overwrite,
+      }),
+    });
 
-      setMessage('Precios actualizados correctamente');
-    } catch (err) {
-      setMessage(err.message || 'Error al guardar precios');
-    } finally {
-      setLoading(false);
+    const result = await res.json();
+    setLoading(false);
+    if (res.ok) {
+      setSuccess(true);
+    } else {
+      setError(result.message || 'Error al guardar');
     }
   };
 
   return (
-    <DashboardLayout pageTitle='Carga masiva de precios'>
-      <h1>Edición masiva de precios diarios</h1>
+    <DashboardLayout pageTitle="Carga masiva de precios">
+      <h1>Carga masiva de precios y capacidad</h1>
 
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          fetchPrices();
-        }}
-        style={{ marginBottom: '2rem' }}
-      >
-        <label>
-          Habitación:
-          <select
-            name="roomId"
-            value={form.roomId}
-            onChange={handleChange}
-            required
-          >
-            <option value="">Seleccionar</option>
-            {rooms.map((room) => (
-              <option key={room.id} value={room.id}>
-                {room.name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <br />
-        <label>
-          Desde:
-          <input
-            type="date"
-            name="from"
-            value={form.from}
-            onChange={handleChange}
-            required
-          />
-        </label>
-        <br />
-        <label>
-          Hasta:
-          <input
-            type="date"
-            name="to"
-            value={form.to}
-            onChange={handleChange}
-            required
-          />
-        </label>
-        <br />
-        <button type="submit" disabled={loading}>
-          {loading ? 'Cargando...' : 'Buscar precios'}
-        </button>
-      </form>
+      <div>
+        <label>Desde:</label>
+        <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
+      </div>
+      <div>
+        <label>Hasta:</label>
+        <input type="date" value={to} onChange={(e) => setTo(e.target.value)} />
+      </div>
+      <div>
+        <label>Precio:</label>
+        <input type="number" value={price} onChange={(e) => setPrice(e.target.value)} />
+      </div>
+      <div>
+        <label>Capacidad disponible:</label>
+        <input type="number" value={capacity} onChange={(e) => setCapacity(e.target.value)} />
+      </div>
+      <div>
+        <label>Habitaciones:</label>
+        <select
+          multiple
+          value={selectedRooms}
+          onChange={(e) =>
+            setSelectedRooms(Array.from(e.target.selectedOptions, (opt) => opt.value))
+          }
+        >
+          {rooms.map((room) => (
+            <option key={room.id} value={room.id}>{room.name}</option>
+          ))}
+        </select>
+      </div>
 
-      {message && <p style={{ color: 'red' }}>{message}</p>}
+      <button onClick={handleSubmit} disabled={loading}>
+        {loading ? 'Guardando...' : 'Guardar'}
+      </button>
 
-      {days.length > 0 && (
-        <form onSubmit={handleSubmit}>
-          <table border="1" cellPadding="8">
-            <thead>
-              <tr>
-                <th>Fecha</th>
-                <th>Precio</th>
-              </tr>
-            </thead>
-            <tbody>
-              {days.map((day, i) => (
-                <tr key={day.date}>
-                  <td>{day.date}</td>
-                  <td>
-                    <input
-                      type="number"
-                      value={day.price}
-                      onChange={(e) => handlePriceChange(i, e.target.value)}
-                      required
-                      step="0.01"
-                    />
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+      {error && <p style={{ color: 'red' }}>{error}</p>}
+      {success && <p style={{ color: 'green' }}>Guardado exitosamente</p>}
 
-          <button
-            type="submit"
-            disabled={loading}
-            style={{ marginTop: '1rem' }}
-          >
-            Guardar todos los cambios
-          </button>
-        </form>
+      {conflictModalOpen && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex',
+          alignItems: 'center', justifyContent: 'center'
+        }}>
+          <div style={{ background: 'white', padding: '2rem', borderRadius: '8px', width: '90%', maxWidth: '500px' }}>
+            <h3>Conflictos detectados</h3>
+            <p>Ya hay valores cargados en algunos días para las habitaciones seleccionadas.</p>
+            <p>¿Qué deseás hacer?</p>
+            <button onClick={() => submitBulkUpdate(false)}>✅ Solo agregar donde está vacío</button>
+            <button onClick={() => submitBulkUpdate(true)} style={{ marginLeft: '1rem' }}>❗Sobrescribir existentes</button>
+            <button onClick={() => setConflictModalOpen(false)} style={{ marginLeft: '1rem' }}>Cancelar</button>
+          </div>
+        </div>
       )}
     </DashboardLayout>
   );
 }
 
-export const getServerSideProps = withAuth(async (ctx, user) => {
-  const token = ctx.req.cookies.token || '';
+export const getServerSideProps = withAuth();
 
-  try {
-    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/rooms`, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    });
-
-    const rooms = await res.json();
-
-    if (!res.ok) return { props: { rooms: [] } };
-
-    return {
-      props: { rooms },
-    };
-  } catch {
-    return {
-      props: { rooms: [] },
-    };
-  }
-});
+export default DayPricesBulkPage;

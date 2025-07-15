@@ -56,10 +56,10 @@ export default function Layout({ children }) {
           </Link>
 
 
-          <NavLinks>
+          {/* <NavLinks>
             <Link href="/">Home</Link>
             <Link href="/reservations/lookup">Mis reservas</Link>
-          </NavLinks>
+          </NavLinks> */}
         </NavContent>
       </Nav>
 
