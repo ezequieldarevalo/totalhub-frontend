@@ -497,7 +497,6 @@ export async function getServerSideProps(context) {
 
   const data = await res.json();
 
-  console.log(data.availableRooms[1].features)
 
   return {
     props: {

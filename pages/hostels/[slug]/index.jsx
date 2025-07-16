@@ -209,7 +209,7 @@ export default function HostelPage({ hostel, rooms }) {
 export async function getServerSideProps({ params, locale }) {
   const { slug } = params;
 
-  const res = await fetch(`http://localhost:3001/public/hostels/${slug}/rooms`);
+  const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/public/hostels/${slug}/rooms`);
   if (!res.ok) {
     return { notFound: true };
   }
