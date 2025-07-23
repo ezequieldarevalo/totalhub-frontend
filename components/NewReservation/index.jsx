@@ -89,36 +89,28 @@ const NewReservation = ({ slug, roomId, roomSlug, from, to, guests }) => {
 
 
   useEffect(() => {
-    if (
+    const shouldFetch =
       slug &&
       roomId &&
       from &&
       to &&
       guests &&
       selectedOption &&
-      (!useMuchiCard || (useMuchiCard && discountType))
-    ) {
+      (!useMuchiCard || (useMuchiCard && discountType));
+
+    if (shouldFetch) {
       fetchPrices();
     }
-  }, [slug, roomId, from, to, guests, selectedOption, useMuchiCard, discountType]);
-
-  useEffect(() => {
-    if (
-      selectedOption &&
-      slug &&
-      roomId &&
-      from &&
-      to &&
-      guests &&
-      (!useMuchiCard || (useMuchiCard && discountType))
-    ) {
-      fetchPrices();
-    }
-    // Este se dispara solo cuando se setea por primera vez selectedOption
-    // en caso de que venga ya preseleccionado
-  }, [selectedOption]);
-
-
+  }, [
+    slug,
+    roomId,
+    from,
+    to,
+    guests,
+    selectedOption,
+    useMuchiCard,
+    discountType,
+  ]);
 
   const handleChange = (e) => setForm({ ...form, [e.target.name]: e.target.value });
 
@@ -180,8 +172,8 @@ const NewReservation = ({ slug, roomId, roomSlug, from, to, guests }) => {
     setUseMuchiCard(true);
     setDiscountType(type);
     setShowDiscountModal(false);
-    fetchPrices();
   };
+
 
   const clearDiscount = () => {
     setUseMuchiCard(false);
