@@ -7,7 +7,7 @@ import { useRouter } from 'next/router';
 import Slider from 'react-slick';
 import Modal from 'react-modal';
 import { useState, useEffect, useRef } from 'react';
-import { format } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 import { es, enUS } from 'date-fns/locale';
 
 const Title = styled.h1`
@@ -256,10 +256,10 @@ export default function AvailabilityPage({ hostel, availableRooms, from, to, gue
   const locale = router.locale || 'es';
   const localeMap = { es, en: enUS };
 
-  const formattedFrom = format(new Date(from), 'P', { locale: localeMap[locale] });
-  const formattedTo = format(new Date(to), 'P', { locale: localeMap[locale] });
+  const formattedFrom = format(parseISO(from), 'P', { locale: localeMap[locale] });
+  const formattedTo = format(parseISO(to), 'P', { locale: localeMap[locale] });
 
-  const nights = Math.ceil((new Date(to).getTime() - new Date(from).getTime()) / (1000 * 60 * 60 * 24));
+  const nights = Math.ceil((parseISO(to).getTime() - parseISO(from).getTime()) / (1000 * 60 * 60 * 24));
 
   const openModal = (images) => {
     setModalImages(images);
