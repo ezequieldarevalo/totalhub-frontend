@@ -87,10 +87,6 @@ const NewReservation = ({ slug, roomId, roomSlug, from, to, guests }) => {
     }
   }, [slug, roomId, from, to, guests, selectedOption, useMuchiCard, discountType, t]);
 
-  useEffect(() => {
-    setTotalPrice(null);
-  }, [slug, roomId, from, to, guests, selectedOption, useMuchiCard, discountType]);
-
 
   useEffect(() => {
     if (
