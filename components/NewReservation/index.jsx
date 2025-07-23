@@ -56,9 +56,18 @@ const NewReservation = ({ slug, roomId, roomSlug, from, to, guests }) => {
     setPriceLoading(true);
 
     const isResident = selectedOption.startsWith('argentino');
-    const paymentMethod = isResident
-      ? (selectedOption.includes('tarjeta') ? 'card' : 'cash')
-      : (useMuchiCard && discountType) || 'card';
+    let paymentMethod = 'card';
+
+    if (isResident) {
+      paymentMethod = selectedOption.includes('tarjeta') ? 'card' : 'cash';
+    } else {
+      if (useMuchiCard && discountType) {
+        paymentMethod = discountType; // puede ser 'cash', 'debit' o 'credit'
+      } else {
+        paymentMethod = 'card';
+      }
+    }
+
 
 
     try {
