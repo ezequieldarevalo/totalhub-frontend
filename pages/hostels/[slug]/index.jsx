@@ -88,6 +88,8 @@ const DateFieldWrapper = styled.div`
 `;
 
 export default function HostelPage({ hostel, rooms }) {
+  const [fromOpen, setFromOpen] = useState(false);
+  const [toOpen, setToOpen] = useState(false);
   const [from, setFrom] = useState(null);
   const [to, setTo] = useState(null);
   const [guests, setGuests] = useState(1);
@@ -159,7 +161,14 @@ export default function HostelPage({ hostel, rooms }) {
             <DateFieldWrapper>
               <StyledDatePicker
                 selected={from}
-                onChange={(date) => setFrom(date)}
+                onChange={(date) => {
+                  setFrom(date);
+                  setFromOpen(false); // fuerza cierre
+                }}
+                onClickOutside={() => setFromOpen(false)}
+                onSelect={() => setFromOpen(false)}
+                onFocus={() => setFromOpen(true)}
+                open={fromOpen}
                 name="from"
                 locale={i18n?.language}
                 dateFormat="P"
@@ -167,7 +176,6 @@ export default function HostelPage({ hostel, rooms }) {
                 required
                 autoComplete="off"
                 minDate={today}
-                shouldCloseOnSelect
               />
             </DateFieldWrapper>
           </Field>
@@ -177,7 +185,14 @@ export default function HostelPage({ hostel, rooms }) {
             <DateFieldWrapper>
               <StyledDatePicker
                 selected={to}
-                onChange={(date) => setTo(date)}
+                onChange={(date) => {
+                  setTo(date);
+                  setToOpen(false); // fuerza cierre
+                }}
+                onClickOutside={() => setToOpen(false)}
+                onSelect={() => setToOpen(false)}
+                onFocus={() => setToOpen(true)}
+                open={toOpen}
                 name="to"
                 locale={i18n?.language}
                 dateFormat="P"
@@ -185,7 +200,7 @@ export default function HostelPage({ hostel, rooms }) {
                 required
                 autoComplete="off"
                 minDate={from ? new Date(from.getTime() + 86400000) : new Date(today.getTime() + 86400000)}
-                shouldCloseOnSelect
+                autoComplete="off"
               />
             </DateFieldWrapper>
           </Field>
