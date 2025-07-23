@@ -200,20 +200,24 @@ export default function HostelPage({ hostel, rooms }) {
                 required
                 autoComplete="off"
                 minDate={from ? new Date(from.getTime() + 86400000) : new Date(today.getTime() + 86400000)}
-                autoComplete="off"
               />
             </DateFieldWrapper>
           </Field>
 
           <Field>
             {t('guests')}:
-            <Input
-              type="number"
+            <select
               name="guests"
               value={guests}
-              min={1}
-              onChange={(e) => setGuests(e.target.value)}
-            />
+              onChange={(e) => setGuests(Number(e.target.value))}
+              style={{ padding: '6px', fontSize: '1rem', marginTop: '4px', borderRadius: '4px', border: '1px solid #ccc' }}
+            >
+              {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => (
+                <option key={n} value={n}>
+                  {n}
+                </option>
+              ))}
+            </select>
           </Field>
 
           <Button type="submit">{t('search')}</Button>
