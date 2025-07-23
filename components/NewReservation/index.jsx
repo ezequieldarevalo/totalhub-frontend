@@ -58,7 +58,8 @@ const NewReservation = ({ slug, roomId, roomSlug, from, to, guests }) => {
     const isResident = selectedOption.startsWith('argentino');
     const paymentMethod = isResident
       ? (selectedOption.includes('tarjeta') ? 'card' : 'cash')
-      : 'card';
+      : (useMuchiCard && discountType) || 'card';
+
 
     try {
       const res = await fetch(
