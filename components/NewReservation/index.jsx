@@ -88,8 +88,41 @@ const NewReservation = ({ slug, roomId, roomSlug, from, to, guests }) => {
   }, [slug, roomId, from, to, guests, selectedOption, useMuchiCard, discountType, t]);
 
   useEffect(() => {
-    fetchPrices();
-  }, [fetchPrices]);
+    setTotalPrice(null);
+  }, [slug, roomId, from, to, guests, selectedOption, useMuchiCard, discountType]);
+
+
+  useEffect(() => {
+    if (
+      slug &&
+      roomId &&
+      from &&
+      to &&
+      guests &&
+      selectedOption &&
+      (!useMuchiCard || (useMuchiCard && discountType))
+    ) {
+      fetchPrices();
+    }
+  }, [slug, roomId, from, to, guests, selectedOption, useMuchiCard, discountType]);
+
+  useEffect(() => {
+    if (
+      selectedOption &&
+      slug &&
+      roomId &&
+      from &&
+      to &&
+      guests &&
+      (!useMuchiCard || (useMuchiCard && discountType))
+    ) {
+      fetchPrices();
+    }
+    // Este se dispara solo cuando se setea por primera vez selectedOption
+    // en caso de que venga ya preseleccionado
+  }, [selectedOption]);
+
+
 
   const handleChange = (e) => setForm({ ...form, [e.target.name]: e.target.value });
 
@@ -157,7 +190,6 @@ const NewReservation = ({ slug, roomId, roomSlug, from, to, guests }) => {
   const clearDiscount = () => {
     setUseMuchiCard(false);
     setDiscountType(null);
-    fetchPrices();
   };
 
   return (
@@ -191,8 +223,13 @@ const NewReservation = ({ slug, roomId, roomSlug, from, to, guests }) => {
                   value={option}
                   checked={selectedOption === option}
                   onChange={(e) => {
-                    setSelectedOption(e.target.value);
-                    clearDiscount();
+                    const newValue = e.target.value;
+                    console.log('Selected option:', newValue);
+                    setSelectedOption(newValue);
+
+                    if (!newValue.startsWith('no-argentino')) {
+                      clearDiscount();
+                    }
                   }}
                 />
                 <span>{label}</span>
@@ -237,9 +274,9 @@ const NewReservation = ({ slug, roomId, roomSlug, from, to, guests }) => {
         </>
       )}
 
-      {priceLoading ? (
+      {priceLoading || totalPrice === null ? (
         <p>{t('loading_price', { defaultValue: 'Calculando precio...' })}</p>
-      ) : totalPrice !== null && (
+      ) : (
         <div
           style={{
             display: 'flex',
@@ -256,6 +293,7 @@ const NewReservation = ({ slug, roomId, roomSlug, from, to, guests }) => {
           </Button>
         </div>
       )}
+
 
       <Form onSubmit={handleSubmit}>
         <Field>
