@@ -138,8 +138,7 @@ const NewReservation = ({ slug, roomId, roomSlug, from, to, guests }) => {
           if (isResident) {
             return selectedOption.includes('tarjeta') ? 'card' : 'cash';
           } else {
-            if (useMuchiCard && discountType) return discountType;
-            return 'card';
+            return discountType === 'cash' ? 'cash' : 'card';
           }
         })(),
         isResident: selectedOption.startsWith('argentino'),
