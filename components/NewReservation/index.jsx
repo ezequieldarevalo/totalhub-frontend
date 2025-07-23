@@ -112,7 +112,15 @@ const NewReservation = ({ slug, roomId, roomSlug, from, to, guests }) => {
         from,
         to,
         guests: numGuests,
-        paymentMethod: selectedOption.includes('tarjeta') ? 'card' : 'cash',
+        paymentMethod: (() => {
+          const isResident = selectedOption.startsWith('argentino');
+          if (isResident) {
+            return selectedOption.includes('tarjeta') ? 'card' : 'cash';
+          } else {
+            if (useMuchiCard && discountType) return discountType;
+            return 'card';
+          }
+        })(),
         isResident: selectedOption.startsWith('argentino'),
         hasMuchiCard: useMuchiCard,
         muchiCardType: useMuchiCard && discountType ? discountType : undefined,
