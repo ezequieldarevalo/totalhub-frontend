@@ -167,6 +167,7 @@ export default function HostelPage({ hostel, rooms }) {
                 required
                 autoComplete="off"
                 minDate={today}
+                shouldCloseOnSelect
               />
             </DateFieldWrapper>
           </Field>
@@ -184,6 +185,7 @@ export default function HostelPage({ hostel, rooms }) {
                 required
                 autoComplete="off"
                 minDate={from ? new Date(from.getTime() + 86400000) : new Date(today.getTime() + 86400000)}
+                shouldCloseOnSelect
               />
             </DateFieldWrapper>
           </Field>
