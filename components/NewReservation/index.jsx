@@ -19,6 +19,7 @@ import {
   DiscountOption,
   ReservationSummary,
 } from './NewReservation.styles';
+import { parseISO } from 'date-fns';
 
 const NewReservation = ({ slug, roomId, roomSlug, from, to, guests }) => {
   const { t, i18n } = useTranslation('common');
@@ -38,11 +39,11 @@ const NewReservation = ({ slug, roomId, roomSlug, from, to, guests }) => {
 
   const numGuests = parseInt(guests || '0', 10);
   const numNights = from && to
-    ? (new Date(to).getTime() - new Date(from).getTime()) / (1000 * 60 * 60 * 24)
+    ? (parseISO(to).getTime() - parseISO(from).getTime()) / (1000 * 60 * 60 * 24)
     : 0;
 
   const formatDate = (str) =>
-    new Intl.DateTimeFormat(i18n.language, { dateStyle: 'long' }).format(new Date(str));
+    new Intl.DateTimeFormat(i18n.language, { dateStyle: 'long' }).format(parseISO(str));
 
   useEffect(() => {
     if (!slug || !roomId || !from || !to || !guests) {
